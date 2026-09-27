@@ -122,16 +122,79 @@ body.sp-open { overflow: hidden; }
 .sp-step span { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .sp-step.cur { background: #fff3e0; box-shadow: 0 0 0 2px #f08c00; }
 .sp-step.done span { color: var(--ink); }
-#spCheer { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%) scale(.6); font-size: 64px; font-weight: 800; color: #f08c00;
+#spCheer, #prCheer { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%) scale(.6); font-size: 64px; font-weight: 800; color: #f08c00;
   text-shadow: 0 3px 0 #fff, 0 6px 18px rgba(0,0,0,.2); opacity: 0; pointer-events: none; z-index: 13; white-space: nowrap; }
-#spCheer.show { animation: cheer 1.8s ease-out; }
+#spCheer.show, #prCheer.show { animation: cheer 1.8s ease-out; }
 @keyframes cheer { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.5); } 20% { opacity: 1; transform: translate(-50%,-50%) scale(1.15); }
   70% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 100% { opacity: 0; transform: translate(-50%,-60%) scale(1); } }
 #pop, #veil { z-index: 30; }
 #veil { z-index: 25; }
 
+.practice-btn { border: 0; border-radius: 14px; background: #f08c00; color: #fff; font-size: 18px; font-weight: 700;
+  padding: 0 16px; min-width: 100px; line-height: 1.35; box-shadow: 0 2px 6px rgba(240,140,0,.35); }
+
+/* 自由练习 */
+#prPage { position: fixed; inset: 0; z-index: 11; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none;
+  padding: calc(10px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); }
+#prPage[hidden] { display: none; }
+body.pr-open { overflow: hidden; }
+.pr-top { display: flex; align-items: center; gap: 12px; min-height: 52px; flex-wrap: wrap; }
+.pr-top .btn { font-size: 17px; }
+.pr-title { flex: 1; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+#prPy { font-family: "TZPinyin", sans-serif; font-size: 28px; }
+#prPos { color: var(--muted); font-size: 16px; }
+.pr-main { display: flex; gap: 22px; align-items: flex-start; justify-content: center; margin-top: 8px; }
+#prStage { position: relative; flex: none; background: var(--paper); border-radius: 10px; touch-action: none; }
+#prStage > * { position: absolute; left: 0; top: 0; }
+#prCanvas { touch-action: none; }
+#prTplLayer { pointer-events: none; }
+#prStage.shake { animation: shake .4s; }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.pr-side { display: grid; gap: 12px; width: 320px; grid-template-columns: 1fr 1fr;
+  grid-template-areas: "model model" "tpl tpl" "stars stars" "undo clear" "done done" "prev next" "hint hint"; }
+@media (orientation: portrait) {
+  .pr-main { flex-direction: column; align-items: center; }
+  .pr-side { width: min(100%, 720px); grid-template-columns: 170px 1fr 1fr;
+    grid-template-areas: "model tpl tpl" "model stars stars" "model undo clear" "prev done next" "hint hint hint"; }
+}
+#prModelBox { grid-area: model; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#prModelBox span { font-size: 14px; color: var(--muted); }
+#prModel svg { background: var(--paper); border-radius: 6px; display: block; }
+#prTplSeg { grid-area: tpl; justify-self: center; align-self: center; }
+#prTplSeg button { font-size: 17px; padding: 8px 16px; }
+#prStarsBox { grid-area: stars; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+#prStars span { font-size: 30px; color: #d9d4c7; }
+#prStars span.on { color: #f08c00; }
+#prStars em { font-style: normal; color: #f08c00; font-weight: 700; margin-left: 4px; }
+#prStarsBox label { font-size: 14px; color: var(--muted); }
+#prStarsBox select { font-size: 15px; padding: 4px 6px; border-radius: 8px; border: 1px solid #d8d3c4; background: #fff; }
+.pr-side .big { border: 0; border-radius: 16px; min-height: 60px; padding: 0 14px; font-size: 20px; font-weight: 700;
+  background: #fff; color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.pr-side .big:disabled { opacity: .4; }
+#prUndo { grid-area: undo; } #prClear { grid-area: clear; } #prPrev { grid-area: prev; } #prNext { grid-area: next; }
+#prDone { grid-area: done; background: var(--accent); color: #fff; min-height: 72px; font-size: 24px; }
+#prHint { grid-area: hint; justify-self: center; }
+#prAttempts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 18px auto 0; max-width: 1100px; }
+#prAttempts .lbl { color: var(--muted); font-size: 15px; }
+.thumb { background: var(--paper); border-radius: 4px; }
+#prSummary { position: fixed; inset: 0; z-index: 14; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; padding: 20px; }
+#prSummary[hidden] { display: none; }
+.pr-sum-box { background: var(--bg); border-radius: 18px; width: min(100%, 960px); max-height: 90vh; overflow-y: auto; padding: 18px 22px; }
+.pr-sum-box h2 { margin: 4px 0 10px; font-size: 26px; }
+.pr-sum-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #e3dfd3; flex-wrap: wrap; cursor: pointer; }
+.pr-sum-row .py { font-family: "TZPinyin", "PingFang SC", sans-serif; font-size: 20px; min-width: 56px; }
+.pr-sum-row .cnt { margin-left: auto; color: var(--muted); font-size: 15px; }
+.pr-sum-row .cnt.ok { color: var(--accent); font-weight: 700; }
+.pr-sum-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.pr-sum-actions .btn { font-size: 17px; min-height: 48px; padding: 0 18px; }
+#spPractice { background: #f08c00; color: #fff; }
+#updateBar { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 40;
+  background: #1d1d1f; color: #fff; border: 0; border-radius: 22px; padding: 10px 18px; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+#updateBar[hidden] { display: none; }
+
 @media print {
-  header, .hint, #pop, #veil, #spPage { display: none !important; }
+  header, .hint, #pop, #veil, #spPage, #prPage, #updateBar { display: none !important; }
   body, main, #sheet { background: #fff; box-shadow: none; padding: 0; margin: 0; }
   #sheet svg { break-inside: avoid; margin-bottom: 14px; }
 }
@@ -142,6 +205,7 @@ body.sp-open { overflow: hidden; }
   <div class="topline">
     <div class="tabs" id="tabs"><button data-v="han">汉字</button><button data-v="num">数字</button></div>
     <textarea id="input" rows="2" placeholder="在这里输入要练习的汉字，换行就另起一行" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+    <button class="practice-btn" id="practiceBtn">✏️<br>自由练习</button>
   </div>
   <div class="tools">
     <div class="seg han-only" id="segPinyin">
@@ -165,7 +229,7 @@ body.sp-open { overflow: hidden; }
 </header>
 <main>
   <div id="sheet"></div>
-  <p class="hint" id="hint">点一下字，看它怎么写（笔顺、描一描）。读音不对也在那里改，改过的拼音显示为橙色。</p>
+  <p class="hint" id="hint">点一下字，看它怎么写（笔顺、描一描）；点“自由练习”，自己一个字一个字地写。读音不对在笔顺页改，改过的拼音显示为橙色。</p>
 </main>
 
 <section id="spPage" hidden>
@@ -181,12 +245,50 @@ body.sp-open { overflow: hidden; }
       <button class="big" id="spPlay">▶ 看一看</button>
       <button class="big" id="spNext">第一笔</button>
       <button class="big" id="spTrace">✍️ 描一描</button>
+      <button class="big" id="spPractice">✏️ 自己写</button>
       <div id="spSay"></div>
     </div>
   </div>
   <div id="spSteps"></div>
   <div id="spCheer"></div>
 </section>
+
+<section id="prPage" hidden>
+  <div class="pr-top">
+    <button class="btn ghost" id="prBack">‹ 返回</button>
+    <div class="pr-title"><span id="prPy"></span><span id="prPos"></span></div>
+    <button class="btn ghost" id="prSay">🔊 读一读</button>
+    <button class="btn ghost" id="prHw">📋 看作业</button>
+  </div>
+  <div class="pr-main">
+    <div id="prStage"></div>
+    <div class="pr-side">
+      <div id="prModelBox"><div id="prModel"></div><span>照着这个字写</span></div>
+      <div class="seg" id="prTplSeg"><button data-v="trace">描着写</button><button data-v="copy">照着写</button></div>
+      <div id="prStarsBox"><div id="prStars"></div><label>每个字写 <select id="prTarget"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select> 遍</label></div>
+      <button class="big" id="prUndo">↶ 撤销</button>
+      <button class="big" id="prClear">擦掉</button>
+      <button class="big" id="prDone">✓ 写好了</button>
+      <button class="big" id="prPrev">◀ 上一个</button>
+      <button class="big" id="prNext">下一个 ▶</button>
+      <button class="btn ghost" id="prHint">不会写？看笔顺</button>
+    </div>
+  </div>
+  <div id="prAttempts"></div>
+  <div id="prCheer"></div>
+  <div id="prSummary" hidden>
+    <div class="pr-sum-box">
+      <h2 id="prSumTitle"></h2>
+      <div id="prSumList"></div>
+      <div class="pr-sum-actions">
+        <button class="btn ghost" id="prSumExit">回首页</button>
+        <button class="btn ghost" id="prSumClose">接着写</button>
+        <button class="btn" id="prSumAgain">再练一遍</button>
+      </div>
+    </div>
+  </div>
+</section>
+<button id="updateBar" hidden>有新版本，点这里更新</button>
 
 <div id="veil"></div>
 <div id="pop" role="dialog">
@@ -202,6 +304,7 @@ body.sp-open { overflow: hidden; }
 <script src="vendor/pinyin-pro.js"></script>
 <script src="vendor/hanzi-writer.js"></script>
 <script src="js/strokes.js"></script>
+<script src="js/practice.js"></script>
 <script>
 (() => {
   const { pinyin, convert } = pinyinPro;
@@ -392,17 +495,36 @@ body.sp-open { overflow: hidden; }
   $("popInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("popOk").click(); });
   $("popReset").onclick = (e) => { e.preventDefault(); if (popIndex >= 0) setPy(items[popIndex].auto); };
   veil.onclick = closePop;
+  // 自由练习的字表：当前页里的汉字和数字，去重，保留顺序和（改过的）拼音
+  function practiceList() {
+    const seen = new Set(), list = [];
+    items.forEach((it, i) => {
+      if (!(it.zh || TZ.isDigit(it.ch)) || seen.has(it.ch)) return;
+      seen.add(it.ch);
+      list.push({ ch: it.ch, py: it.zh ? pyOf(i) : "" });
+    });
+    return list;
+  }
+  function practiceFrom(ch) {
+    const list = practiceList();
+    if (!list.length) { alert("先在上面输入要练习的字。"); return; }
+    TZ.Practice.open(list, ch == null ? null : list.findIndex((x) => x.ch === ch));
+  }
+  $("practiceBtn").onclick = () => practiceFrom(null);
+
   sheet.addEventListener("click", (e) => {
     const g = e.target.closest(".cell"); if (!g) return;
     const i = +g.dataset.i, it = items[i];
-    if (TZ.isDigit(it.ch)) { TZ.StrokePage.open(it.ch); return; }
+    if (TZ.isDigit(it.ch)) { TZ.StrokePage.open(it.ch, { onPractice: practiceFrom }); return; }
     if (!it.zh) return;
     TZ.StrokePage.open(it.ch, {
       pinyin: pyOf(i),
       onFixPinyin: (anchor, done) => { openPop(i, anchor); popDone = done; },
+      onPractice: practiceFrom,
     });
   });
-  TZ.StrokePage.init({ color: () => state.color });
+  TZ.StrokePage.init({ color: () => state.color, grid: () => state.grid });
+  TZ.Practice.init({ color: () => state.color, grid: () => state.grid });
 
   // 汉字 / 数字
   const tabs = $("tabs");
@@ -461,7 +583,13 @@ body.sp-open { overflow: hidden; }
   Promise.all([document.fonts.load("20px TZPinyin", "zhāng"), document.fonts.load("20px TZKai", "永"), TZ.ready])
     .then(() => { document.documentElement.dataset.fonts = "ready"; render(); });
 
-  if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("sw.js");
+  if ("serviceWorker" in navigator && isSecureContext) {
+    // 已经装过的旧版本在后台更新好之后，提示点一下刷新（第一次安装不提示）
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) $("updateBar").hidden = false; });
+    $("updateBar").onclick = () => location.reload();
+    navigator.serviceWorker.register("sw.js");
+  }
 })();
 </script>
 </body>

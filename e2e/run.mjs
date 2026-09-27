@@ -338,6 +338,203 @@ try {
   await page.tap("#spBack");
   await page.setViewportSize(iPad.viewport);
 
+  // 14. 自由练习（对照前面列出的出错方式逐条检查）
+  await page.evaluate(() => { localStorage.removeItem("tz-ink"); localStorage.removeItem("tz-practice"); });
+  await page.reload(); await page.waitForSelector("html[data-fonts=ready]");
+  if (!(await page.isVisible("#segPinyin"))) await page.tap('#tabs button[data-v="han"]');
+  await setText(page, "大小，大3");
+  const pst = () => page.evaluate(() => {
+    const s = TZ.Practice.state(), ch = s.cur?.item.ch;
+    const at = (c) => (s.inkStore[c] || []).filter((a) => a.t >= s.pr.session.start).length;
+    return { ch, strokes: s.cur?.strokes.length, idx: s.pr.session?.idx, list: s.pr.session?.list.map((x) => x.ch).join(""),
+             count: ch ? at(ch) : 0, counts: Object.fromEntries((s.pr.session?.list || []).map((x) => [x.ch, at(x.ch)])) };
+  });
+  // 用合成指针事件模拟手指（touch）和 Apple Pencil（pen）；坐标是格子里的 0–1
+  const ptr = (type, kind, id, xy) => page.evaluate(({ type, kind, id, xy }) => {
+    const cv = document.getElementById("prCanvas"), r = cv.getBoundingClientRect();
+    cv.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: kind, isPrimary: true, bubbles: true, cancelable: true,
+      clientX: r.left + xy[0] * r.width, clientY: r.top + xy[1] * r.height, pressure: type === "pointerup" ? 0 : 0.5, buttons: type === "pointerup" ? 0 : 1 }));
+  }, { type, kind, id, xy });
+  async function stroke(kind, from, to, id = 21) {
+    await ptr("pointerdown", kind, id, from);
+    for (let t = 1; t <= 8; t++) await ptr("pointermove", kind, id, [from[0] + (to[0] - from[0]) * t / 8, from[1] + (to[1] - from[1]) * t / 8]);
+    await ptr("pointerup", kind, id, to);
+  }
+  const waitCh = (ch) => page.waitForFunction((ch) => document.getElementById("prPage").dataset.ch === ch, ch, { timeout: 8000 });
+
+  await clearUtter();
+  await page.tap("#practiceBtn");
+  await waitCh("大");
+  let P = await pst();
+  check("自由练习字表：去掉标点、重复字，保留数字（大小3）", P.list === "大小3", P.list);
+  check("出字时朗读“写一写，大”", (await utter()).includes("写一写，大"));
+  const tplShown = await page.$eval("#prTplLayer", (e) => e.style.display !== "none" && e.querySelectorAll(".glyph path").length > 0);
+  check("默认“描着写”：格子里有淡红色的字垫底，旁边有范字", tplShown && (await page.$$eval("#prModel .glyph path", (x) => x.length)) > 0);
+
+  // 出错方式 1：笔迹和手指位置对不上 → 用真实鼠标划一横，按像素核对位置
+  const box = await page.$eval("#prCanvas", (c) => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width }; });
+  await page.mouse.move(box.x + box.w * 0.2, box.y + box.w * 0.5); await page.mouse.down();
+  for (let t = 1; t <= 12; t++) await page.mouse.move(box.x + box.w * (0.2 + 0.6 * t / 12), box.y + box.w * 0.5);
+  await page.mouse.up();
+  {
+    const buf = await page.screenshot({ clip: { x: box.x, y: box.y, width: box.w, height: box.w } });
+    const ink = inkBox({ png: PNG.sync.read(buf), scale }, 0, box.w);
+    const lw = box.w * 0.05, tol = 4;
+    const ok = ink && Math.abs((ink.top + ink.bottom) / 2 - box.w * 0.5) <= tol && Math.abs(ink.left - (box.w * 0.2 - lw / 2)) <= tol
+               && Math.abs(ink.right - (box.w * 0.8 + lw / 2)) <= tol && Math.abs(ink.bottom - ink.top - lw) <= tol;
+    check("笔迹落在手指划过的地方（像素误差 ≤ 4px）", ok, ink ? `中线 y=${((ink.top + ink.bottom) / 2).toFixed(1)} 应 ${(box.w * 0.5).toFixed(1)}，左 ${ink.left.toFixed(1)} 右 ${ink.right.toFixed(1)}，粗 ${(ink.bottom - ink.top).toFixed(1)}` : "没有墨迹");
+  }
+  await page.screenshot({ path: path.join(out, "16-自由练习-描着写.png") });
+
+  // 出错方式 2：手指画不出来
+  await stroke("touch", [0.5, 0.2], [0.5, 0.8]);
+  P = await pst();
+  check("手指（touch）能写", P.strokes === 2, `strokes=${P.strokes}`);
+
+  // 出错方式 3：用笔时手掌乱画 / 防误触太严
+  await ptr("pointerdown", "pen", 31, [0.3, 0.3]);
+  await ptr("pointerdown", "touch", 32, [0.8, 0.9]);          // 笔落下时手掌碰到
+  await ptr("pointermove", "touch", 32, [0.85, 0.95]); await ptr("pointerup", "touch", 32, [0.85, 0.95]);
+  for (let t = 1; t <= 6; t++) await ptr("pointermove", "pen", 31, [0.3 + t * 0.05, 0.3]);
+  await ptr("pointerup", "pen", 31, [0.6, 0.3]);
+  await stroke("touch", [0.2, 0.9], [0.4, 0.9], 33);           // 抬笔后马上碰到的手掌
+  P = await pst();
+  check("用 Apple Pencil 时忽略手掌", P.strokes === 3, `strokes=${P.strokes}`);
+  await page.waitForTimeout(1700);
+  await stroke("touch", [0.2, 0.7], [0.4, 0.7], 34);
+  P = await pst();
+  check("放下笔一会儿后，手指又能写", P.strokes === 4, `strokes=${P.strokes}`);
+  await ptr("pointerdown", "touch", 35, [0.7, 0.7]);            // 手掌先落下，笔随后
+  await ptr("pointermove", "touch", 35, [0.75, 0.75]);
+  await stroke("pen", [0.1, 0.1], [0.3, 0.1], 36);
+  await ptr("pointerup", "touch", 35, [0.75, 0.75]);
+  P = await pst();
+  check("手掌先碰到、笔后落下：手掌那笔被丢掉", P.strokes === 5, `strokes=${P.strokes}`);
+  await page.waitForTimeout(1700);        // 抬笔 1.5 秒内的触摸按手掌处理，后面用手指写要先等一下
+
+  // 出错方式 4：撤销、擦掉
+  await page.tap("#prUndo"); P = await pst();
+  const afterUndo = P.strokes;
+  await page.tap("#prClear"); P = await pst();
+  const afterClear = P.strokes;
+  await page.tap("#prUndo"); P = await pst();
+  check("撤销去掉一笔；擦掉清空；擦掉后还能撤销回来", afterUndo === 4 && afterClear === 0 && P.strokes === 4, `${afterUndo}/${afterClear}/${P.strokes}`);
+
+  // 出错方式 5：空格子也能存
+  await page.tap("#prClear");
+  await clearUtter();
+  await page.tap("#prDone");
+  P = await pst();
+  check("什么都没写就按“写好了”：不保存，并提醒先写", P.count === 0 && (await utter()).includes("先写一写吧"));
+
+  // 出错方式 6：遍数、自动换字
+  for (let k = 1; k <= 3; k++) {
+    await stroke("touch", [0.3, 0.4], [0.7, 0.4]);
+    await stroke("touch", [0.5, 0.2], [0.5, 0.8]);
+    await page.tap("#prDone");
+    if (k < 3) { P = await pst(); if (P.count !== k) break; }
+  }
+  const stars = await page.$$eval("#prStars span.on", (x) => x.length);
+  const thumbs = await page.$$eval("#prAttempts .thumb", (x) => x.length);
+  check("写好 3 遍：3 颗星、3 个缩略图", stars === 3 && thumbs === 3, `stars=${stars} thumbs=${thumbs}`);
+  await page.screenshot({ path: path.join(out, "17-自由练习-写够三遍.png") });
+  await waitCh("小");
+  P = await pst();
+  check("写够遍数后自动换下一个字“小”，并说“这个字练好了”", P.ch === "小" && P.count === 0 && (await utter()).includes("这个字练好了"));
+
+  // 出错方式 8：描着写 / 照着写切换
+  await page.tap('#prTplSeg button[data-v="copy"]');
+  const hidden = await page.$eval("#prTplLayer", (e) => e.style.display === "none");
+  check("“照着写”：格子里不垫字，范字还在旁边", hidden && (await page.$$eval("#prModel .glyph path", (x) => x.length)) > 0);
+  await stroke("touch", [0.5, 0.15], [0.5, 0.85]);
+  await page.screenshot({ path: path.join(out, "18-自由练习-照着写.png") });
+
+  // 出错方式 9：没按“写好了”就换字
+  await page.tap("#prNext");
+  await waitCh("3");
+  P = await pst();
+  check("没按“写好了”就点下一个：刚写的也存成一遍", P.counts["小"] === 1, JSON.stringify(P.counts));
+  await page.tap('#prTplSeg button[data-v="trace"]');
+  const digitTpl = await page.$eval("#prTplLayer", (e) => e.querySelectorAll(".glyph path").length);
+  check("数字“3”也有垫底的字形", digitTpl === (await page.evaluate(() => TZ.DIGITS["3"].s.length)));
+  check("最后一个字的按钮变成“看作业”", (await page.textContent("#prNext")).includes("看作业"));
+
+  // 看作业
+  await page.tap("#prNext");
+  await page.waitForSelector("#prSummary:not([hidden])");
+  const sumRows = await page.$$eval(".pr-sum-row", (rs) => rs.map((r) => ({ ch: r.dataset.ch, thumbs: r.querySelectorAll(".thumb").length, cnt: r.querySelector(".cnt").textContent })));
+  check("作业本：每个字一行，显示写了几遍", sumRows.length === 3 && sumRows[0].thumbs === 3 && sumRows[0].cnt.includes("写了 3 遍") && sumRows[1].thumbs === 1 && sumRows[2].cnt === "还没写",
+        JSON.stringify(sumRows));
+  check("还有没写完的字：标题是“看看写了哪些”", (await page.textContent("#prSumTitle")) === "看看写了哪些");
+  await page.screenshot({ path: path.join(out, "19-看作业.png") });
+  await page.tap('.pr-sum-row[data-ch="小"]');
+  await waitCh("小");
+  check("点作业本里的字，回到那个字接着写", (await page.isHidden("#prSummary")));
+
+  // 出错方式 10：看完笔顺回来，写到一半的字没了
+  await stroke("touch", [0.3, 0.5], [0.7, 0.5]);
+  await page.tap("#prHint");
+  await page.waitForSelector("#spPage:not([hidden])");
+  const hintOk = (await page.evaluate(() => TZ.StrokePage.state()?.ch)) === "小" && await page.isHidden("#spPractice");
+  await page.tap("#spBack");
+  P = await pst();
+  check("“不会写？看笔顺”打开笔顺页；返回后写了一半的笔画还在", hintOk && P.strokes === 1 && !(await page.isHidden("#prPage")), `strokes=${P.strokes}`);
+
+  // 出错方式 7：刷新 / App 被关掉
+  await page.reload(); await page.waitForSelector("html[data-fonts=ready]");
+  await page.tap("#practiceBtn");
+  await waitCh("小");
+  P = await pst();
+  check("重新打开：接着上次的字，写了一半的笔画和已存的遍数都在", P.ch === "小" && P.strokes === 1 && P.counts["大"] === 3 && P.counts["小"] === 1, JSON.stringify(P));
+
+  // 出错方式 11：转屏
+  await page.setViewportSize({ width: 1133, height: 744 });   // iPad mini 横屏，格子尺寸会变
+  await page.waitForTimeout(400);
+  const S2 = await page.$eval("#prCanvas", (c) => c.getBoundingClientRect().width);
+  P = await pst();
+  const sideOk = await page.evaluate(() => document.querySelector(".pr-side").getBoundingClientRect().left >= document.getElementById("prStage").getBoundingClientRect().right);
+  check("转成横屏（iPad mini 尺寸）：格子重排、笔画还在、按钮在右边", Math.round(S2) !== Math.round(box.w) && P.strokes === 1 && sideOk, `S ${Math.round(box.w)}→${Math.round(S2)}`);
+  await page.screenshot({ path: path.join(out, "20-自由练习-横屏.png") });
+  await page.setViewportSize(iPad.viewport);
+  await page.waitForTimeout(300);
+
+  // 出错方式 7b：存储满了
+  await page.evaluate(() => {
+    const s = TZ.Practice.state();
+    s.inkStore["猫"] = [{ t: 1, s: [[100, 100, 200, 200]] }];
+    const orig = Storage.prototype.setItem;
+    window.__quotaOnce = true;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === "tz-ink" && window.__quotaOnce) { window.__quotaOnce = false; throw new DOMException("full", "QuotaExceededError"); }
+      return orig.call(this, k, v);
+    };
+  });
+  await page.tap("#prDone");
+  const quota = await page.evaluate(() => ({ cat: "猫" in TZ.Practice.state().inkStore, saved: JSON.parse(localStorage.getItem("tz-ink"))["小"]?.length }));
+  P = await pst();
+  check("存储满了：自动删掉不在本次作业里的旧记录，这一遍照样存上", !quota.cat && quota.saved === 2 && P.counts["小"] === 2, JSON.stringify(quota));
+
+  // 笔顺页 → 自己写
+  await page.tap("#prBack");
+  await page.tap('#sheet .cell[data-i="4"]');                    // “3”
+  await page.waitForSelector("#spPage:not([hidden])");
+  const spBtn = await page.isVisible("#spPractice");
+  await page.tap("#spPractice");
+  await waitCh("3");
+  check("笔顺页的“自己写”直接进入这个字的自由练习", spBtn && (await page.isHidden("#spPage")));
+
+  // 全部写完 → 作业完成
+  await page.selectOption("#prTarget", "1");
+  const goCh = async (ch) => { await page.tap("#prHw"); await page.waitForSelector("#prSummary:not([hidden])"); await page.tap(`.pr-sum-row[data-ch="${ch}"]`); await waitCh(ch); };
+  await stroke("touch", [0.3, 0.3], [0.7, 0.3]); await page.tap("#prDone");
+  await page.waitForSelector("#prSummary:not([hidden])", { timeout: 8000 });
+  check("每个字都写够了：作业本显示“作业写完啦”并表扬", (await page.textContent("#prSumTitle")).includes("作业写完啦") && (await utter()).includes("作业写完了，真棒！"));
+  await page.tap("#prSumAgain");
+  await waitCh("大");
+  P = await pst();
+  check("“再练一遍”从第一个字重新开始计数", P.count === 0 && P.idx === 0);
+  await page.tap("#prBack");
+
   // 8. 断网可用（Service Worker 需要安全来源，用 localhost 打开）
   {
     const cb = await chromium.launch();   // Playwright 的 WebKit 不支持模拟断网，这一项用 Chromium
@@ -349,7 +546,7 @@ try {
     // 等后台把 64 片笔顺数据都缓存好
     let cached = 0;
     for (let t = 0; t < 120 && cached < 64; t++) {
-      cached = await p2.evaluate(async () => (await (await caches.open("tianzige-v2")).keys()).filter((r) => r.url.includes("/data/strokes/")).length);
+      cached = await p2.evaluate(async () => (await (await caches.open("tianzige-strokes-v1")).keys()).filter((r) => r.url.includes("/data/strokes/")).length);
       if (cached < 64) await p2.waitForTimeout(500);
     }
     check("后台缓存全部 64 片笔顺数据", cached === 64, `cached=${cached}`);

@@ -35,10 +35,11 @@
     if (parent) parent.appendChild(n);
     return n;
   }
-  function gridSvg(size, color, parent) {
+  function gridSvg(size, color, parent, mi = false) {
     const svg = el("svg", { width: size, height: size, viewBox: `0 0 ${size} ${size}` }, parent);
     const g = el("g", { stroke: color, fill: "none" }, svg);
     const w = Math.max(1.2, size / 160);
+    if (mi) el("path", { d: `M0 0L${size} ${size}M${size} 0L0 ${size}`, "stroke-width": w * .5, "stroke-dasharray": `${size / 40} ${size / 50}`, opacity: .7 }, g);
     el("path", { d: `M${size / 2} 0V${size}M0 ${size / 2}H${size}`, "stroke-width": w * .7, "stroke-dasharray": `${size / 40} ${size / 50}` }, g);
     el("rect", { x: w / 2, y: w / 2, width: size - w, height: size - w, "stroke-width": w * 1.4 }, g);
     return svg;
@@ -70,7 +71,7 @@
   // ---------- 页面 ----------
   const $ = (id) => document.getElementById(id);
   let ctx = null;        // { ch, data, writer, cur, n, token, mode }
-  let hooks = { color: () => "#3a9a5b", pinyin: () => "", fixPinyin: null };
+  let hooks = { color: () => "#3a9a5b", grid: () => "tian" };
 
   function strokeLabel(i) {
     const d = ctx.data;
@@ -91,7 +92,7 @@
     const stage = $("spStage");
     stage.textContent = "";
     stage.style.width = stage.style.height = S + "px";
-    gridSvg(S, hooks.color(), stage).classList.add("sp-grid");
+    gridSvg(S, hooks.color(), stage, hooks.grid() === "mi").classList.add("sp-grid");
     const wdiv = document.createElement("div"); wdiv.id = "spWriter"; stage.appendChild(wdiv);
     const ov = el("svg", { id: "spOverlay", width: S, height: S, viewBox: `0 0 ${S} ${S}` }, stage);
     const ch = ctx.ch;
@@ -174,7 +175,7 @@
   function newToken() { ctx.token = {}; return ctx.token; }
   async function resetDrawing() {
     newToken();
-    speechSynthesis?.cancel?.();
+    window.speechSynthesis?.cancel();
     try { ctx.writer.cancelQuiz(); } catch { }
     await ctx.writer.hideCharacter({ duration: 0 });
     showStart(null); setCur(0);
@@ -280,6 +281,7 @@
     $("spCount").textContent = `共 ${ctx.n} 笔`;
     $("spRhyme").textContent = isDigit(ch) ? data.rhyme : "";
     $("spFix").hidden = !(opts.onFixPinyin);
+    $("spPractice").hidden = !(opts.onPractice);
     $("spVoice").classList.toggle("off", !voiceOn);
     buildStage();
     renderSteps();
@@ -292,7 +294,7 @@
     if (!ctx) return;
     newToken();
     try { ctx.writer.cancelQuiz(); } catch { }
-    speechSynthesis?.cancel?.();
+    window.speechSynthesis?.cancel();
     $("spPage").hidden = true;
     document.body.classList.remove("sp-open");
     ctx = null;
@@ -309,8 +311,9 @@
     $("spVoice").onclick = () => {
       voiceOn = !voiceOn; localStorage.setItem("tz-voice", voiceOn ? "1" : "0");
       $("spVoice").classList.toggle("off", !voiceOn);
-      if (!voiceOn) speechSynthesis?.cancel?.(); else speak("声音打开了");
+      if (!voiceOn) window.speechSynthesis?.cancel(); else speak("声音打开了");
     };
+    $("spPractice").onclick = () => { const o = ctx?.opts, ch = ctx?.ch; close(); o?.onPractice?.(ch); };
     $("spFix").onclick = (e) => ctx?.opts.onFixPinyin?.(e.currentTarget, (py) => { $("spPy").textContent = py; });
     let rt; addEventListener("resize", () => {
       clearTimeout(rt);
@@ -319,8 +322,9 @@
         newToken(); buildStage(); renderSteps(); setCur(0); setMode(""); showStart(null);
       }, 200);
     });
-    addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    addEventListener("keydown", (e) => { if (e.key === "Escape" && ctx) { e.stopImmediatePropagation(); close(); } });
   }
 
-  window.TZ = { ready, loadStroke, isDigit, dataTransform, get DIGITS() { return DIGITS; }, StrokePage: { init, open, close, state: () => ctx } };
+  window.TZ = { ready, loadStroke, isDigit, dataTransform, gridSvg, el, speak, cnNum, get DIGITS() { return DIGITS; },
+                StrokePage: { init, open, close, state: () => ctx, isOpen: () => !!ctx } };
 })();
