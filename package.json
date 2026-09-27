@@ -1,0 +1,24 @@
+{
+  "name": "tianzige",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cnchar": "^3.2.6",
+    "cnchar-order": "^3.2.6",
+    "hanzi-writer": "^3.7.3",
+    "hanzi-writer-data": "^2.0.1",
+    "pinyin-pro": "^3.29.4",
+    "playwright": "^1.61.0"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0"
+  }
+}

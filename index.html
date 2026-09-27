@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="田字格">
+<meta name="theme-color" content="#f6f4ee">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<title>田字格 · 拼音田字格</title>
+<style>
+@font-face { font-family: "TZKai"; src: url(fonts/FandolKai.woff2) format("woff2"); font-display: block; }
+@font-face { font-family: "TZPinyin"; src: url(fonts/Andika-pinyin.woff2) format("woff2"); font-display: block; }
+
+:root {
+  --line: #3a9a5b;
+  --ink: #1d1d1f;
+  --paper: #fffefa;
+  --bg: #f6f4ee;
+  --ui: #ffffff;
+  --muted: #6e6e73;
+  --accent: #2f7d4a;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
+button, select, input, textarea { font: inherit; color: inherit; touch-action: manipulation; }
+
+header {
+  position: sticky; top: 0; z-index: 5;
+  padding: calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left));
+  background: rgba(246, 244, 238, .94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e3dfd3;
+}
+#input {
+  width: 100%; min-height: 64px; max-height: 30vh; resize: vertical;
+  padding: 10px 14px; border: 1.5px solid #d8d3c4; border-radius: 12px; background: var(--ui);
+  font-size: 22px; line-height: 1.4; font-family: "TZKai", "Kaiti SC", "STKaiti", serif; outline: none;
+}
+#input:focus { border-color: var(--accent); }
+.tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 10px; }
+.seg { display: inline-flex; background: #e9e6dc; border-radius: 10px; padding: 3px; }
+.seg button { border: 0; background: transparent; padding: 8px 12px; min-height: 40px; border-radius: 8px; font-size: 15px; white-space: nowrap; }
+.seg button.on { background: var(--ui); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+.field { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); }
+.field input[type=range] { width: 130px; accent-color: var(--accent); }
+.swatch { width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; padding: 0; }
+.swatch.on { border-color: #fff; box-shadow: 0 0 0 2px var(--ink); }
+.btn { border: 0; background: var(--accent); color: #fff; border-radius: 10px; padding: 8px 16px; min-height: 40px; font-size: 15px; }
+.btn.ghost { background: #e9e6dc; color: var(--ink); }
+label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; color: var(--muted); }
+label.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+main { padding: 18px calc(14px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left)); }
+#sheet { background: var(--paper); border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 22px 0 10px; }
+#sheet svg { display: block; margin: 0 auto 18px; overflow: visible; }
+.hint { text-align: center; color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+.cell { cursor: pointer; }
+#sheet { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#sheet text { pointer-events: none; }
+.cell.fixed .py { fill: #c2410c; }
+
+#pop { position: fixed; z-index: 20; display: none; min-width: 240px; max-width: 320px;
+  background: var(--ui); border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.2); padding: 14px; }
+#pop.show { display: block; }
+#pop .han { font-family: "TZKai", "Kaiti SC", serif; font-size: 44px; text-align: center; line-height: 1.1; }
+#pop .cands { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
+#pop .cands button { font-family: "TZPinyin", sans-serif; font-size: 22px; min-width: 64px; min-height: 44px;
+  border: 1.5px solid #d8d3c4; background: #fff; border-radius: 10px; }
+#pop .cands button.on { border-color: var(--accent); background: #e8f3ec; }
+#pop .custom { display: flex; gap: 6px; }
+#pop .custom input { flex: 1; min-width: 0; font-size: 17px; padding: 8px 10px; border: 1.5px solid #d8d3c4; border-radius: 10px; }
+#pop .note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+#veil { position: fixed; inset: 0; z-index: 15; display: none; }
+#veil.show { display: block; }
+
+.topline { display: flex; gap: 10px; align-items: stretch; }
+.tabs { display: flex; flex-direction: column; gap: 6px; }
+.tabs button { border: 0; border-radius: 12px; padding: 0 18px; flex: 1; min-height: 44px; font-size: 18px; font-weight: 600;
+  background: #e9e6dc; color: var(--muted); }
+.tabs button.on { background: var(--accent); color: #fff; }
+.topline #input { flex: 1; }
+body[data-tab=num] .han-only { display: none !important; }
+body.sp-open { overflow: hidden; }
+.rhyme { font-size: 13px; fill: #6e6e73; }
+
+/* 笔顺页 */
+#spPage { position: fixed; inset: 0; z-index: 12; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: calc(10px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); }
+#spPage[hidden] { display: none; }
+.sp-top { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.sp-top .btn { font-size: 17px; }
+.sp-title { flex: 1; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+#spPage[data-kind=digit] #spChar { display: none; }
+#spChar { font-family: "TZKai", "Kaiti SC", serif; font-size: 40px; line-height: 1; }
+#spPy { font-family: "TZPinyin", sans-serif; font-size: 26px; }
+#spCount { color: var(--muted); font-size: 16px; }
+#spFix { font-size: 14px; padding: 6px 10px; min-height: 34px; }
+#spVoice { font-size: 22px; width: 52px; }
+#spVoice.off { opacity: .45; text-decoration: line-through; }
+.sp-main { display: flex; gap: 22px; align-items: center; justify-content: center; margin-top: 8px; }
+@media (orientation: portrait) { .sp-main { flex-direction: column; } }
+#spStage { position: relative; flex: none; background: var(--paper); border-radius: 10px; touch-action: none; }
+#spStage > * { position: absolute; left: 0; top: 0; }
+#spOverlay { pointer-events: none; transition: opacity .4s; }
+#spOverlay.faded { opacity: .3; }
+.sp-side { display: flex; flex-direction: column; gap: 12px; min-width: 240px; max-width: 360px; }
+@media (orientation: portrait) { .sp-side { flex-direction: row; flex-wrap: wrap; justify-content: center; max-width: none; } }
+.sp-side .big { border: 0; border-radius: 16px; min-height: 64px; padding: 0 22px; font-size: 22px; font-weight: 700;
+  background: #fff; color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.sp-side .big.on { background: var(--accent); color: #fff; }
+#spRhyme { font-size: 24px; font-weight: 700; color: #c2410c; text-align: center; }
+#spRhyme:empty { display: none; }
+#spSay { font-size: 19px; color: var(--ink); text-align: center; min-height: 28px; width: 100%; }
+#spSteps { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 20px auto 0; max-width: 1100px; }
+.sp-step { border: 0; background: transparent; padding: 4px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sp-step svg { background: var(--paper); border-radius: 4px; }
+.sp-step span { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.sp-step.cur { background: #fff3e0; box-shadow: 0 0 0 2px #f08c00; }
+.sp-step.done span { color: var(--ink); }
+#spCheer { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%) scale(.6); font-size: 64px; font-weight: 800; color: #f08c00;
+  text-shadow: 0 3px 0 #fff, 0 6px 18px rgba(0,0,0,.2); opacity: 0; pointer-events: none; z-index: 13; white-space: nowrap; }
+#spCheer.show { animation: cheer 1.8s ease-out; }
+@keyframes cheer { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.5); } 20% { opacity: 1; transform: translate(-50%,-50%) scale(1.15); }
+  70% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 100% { opacity: 0; transform: translate(-50%,-60%) scale(1); } }
+#pop, #veil { z-index: 30; }
+#veil { z-index: 25; }
+
+@media print {
+  header, .hint, #pop, #veil, #spPage { display: none !important; }
+  body, main, #sheet { background: #fff; box-shadow: none; padding: 0; margin: 0; }
+  #sheet svg { break-inside: avoid; margin-bottom: 14px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="topline">
+    <div class="tabs" id="tabs"><button data-v="han">汉字</button><button data-v="num">数字</button></div>
+    <textarea id="input" rows="2" placeholder="在这里输入要练习的汉字，换行就另起一行" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+  </div>
+  <div class="tools">
+    <div class="seg han-only" id="segPinyin">
+      <button data-v="1">拼音田字格</button><button data-v="0">田字格</button>
+    </div>
+    <div class="seg" id="segGrid">
+      <button data-v="tian">田字</button><button data-v="mi">米字</button>
+    </div>
+    <div class="seg han-only" id="segMode">
+      <button data-v="all">全部显示</button><button data-v="hideHan">看拼音写字</button><button data-v="hidePy">看字写拼音</button>
+    </div>
+    <span class="field">大小 <input type="range" id="size" min="56" max="180" step="4"><span class="seg"><button id="sizeAuto">自动</button></span></span>
+    <span class="field" id="colors">
+      <button class="swatch" data-c="#3a9a5b" style="background:#3a9a5b" aria-label="绿色格子"></button>
+      <button class="swatch" data-c="#d8453b" style="background:#d8453b" aria-label="红色格子"></button>
+      <button class="swatch" data-c="#3b6fd8" style="background:#3b6fd8" aria-label="蓝色格子"></button>
+    </span>
+    <label class="check han-only"><input type="checkbox" id="sandhi"> “一、不”标变调</label>
+    <button class="btn ghost" id="print">打印</button>
+  </div>
+</header>
+<main>
+  <div id="sheet"></div>
+  <p class="hint" id="hint">点一下字，看它怎么写（笔顺、描一描）。读音不对也在那里改，改过的拼音显示为橙色。</p>
+</main>
+
+<section id="spPage" hidden>
+  <div class="sp-top">
+    <button class="btn ghost" id="spBack">‹ 返回</button>
+    <div class="sp-title"><span id="spChar"></span><span id="spPy"></span><button class="btn ghost" id="spFix">改读音</button><span id="spCount"></span></div>
+    <button class="btn ghost" id="spVoice" aria-label="声音">🔊</button>
+  </div>
+  <div class="sp-main">
+    <div id="spStage"></div>
+    <div class="sp-side">
+      <div id="spRhyme"></div>
+      <button class="big" id="spPlay">▶ 看一看</button>
+      <button class="big" id="spNext">第一笔</button>
+      <button class="big" id="spTrace">✍️ 描一描</button>
+      <div id="spSay"></div>
+    </div>
+  </div>
+  <div id="spSteps"></div>
+  <div id="spCheer"></div>
+</section>
+
+<div id="veil"></div>
+<div id="pop" role="dialog">
+  <div class="han" id="popHan"></div>
+  <div class="cands" id="popCands"></div>
+  <div class="custom">
+    <input id="popInput" placeholder="其他读音，如 zhao1、lv4" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn" id="popOk">确定</button>
+  </div>
+  <div class="note">数字 1–4 表示声调，v 表示 ü。<a href="#" id="popReset">恢复自动读音</a></div>
+</div>
+
+<script src="vendor/pinyin-pro.js"></script>
+<script src="vendor/hanzi-writer.js"></script>
+<script src="js/strokes.js"></script>
+<script>
+(() => {
+  const { pinyin, convert } = pinyinPro;
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  // 字体度量（由字体文件实测）：
+  // FandolKai 汉字字面中心在基线上方 0.31em；Andika 的 x 字高 0.508em。
+  const KAI_CENTER = 0.31, KAI_SIZE = 0.8;
+  const PY_XH = 0.508;
+
+  const $ = (id) => document.getElementById(id);
+  const input = $("input"), sheet = $("sheet"), sizeEl = $("size");
+
+  const defaults = { text: "春眠不觉晓，\n处处闻啼鸟。", numText: "01234\n56789", tab: "han", withPinyin: true, grid: "tian", mode: "all",
+                     size: 0, color: "#3a9a5b", sandhi: true, overrides: {} };
+  let state;
+  try { state = Object.assign({}, defaults, JSON.parse(localStorage.getItem("tianzige") || "{}")); }
+  catch { state = { ...defaults }; }
+  const save = () => localStorage.setItem("tianzige", JSON.stringify(state));
+
+  // ---------- 拼音 ----------
+  let items = [];   // [{ch, py, cands, zh}]
+  const isNum = () => state.tab === "num";
+  const curText = () => isNum() ? state.numText : state.text;
+  function analyse() {
+    if (isNum()) { items = Array.from(state.numText).map((ch) => ({ ch, zh: false, auto: "", cands: [] })); return; }
+    const res = pinyin(state.text, { type: "all", toneSandhi: state.sandhi });
+    items = res.map((r) => ({ ch: r.origin, zh: r.isZh, auto: r.pinyin, cands: r.polyphonic || [] }));
+  }
+  function pyOf(i) { return state.overrides[i] || items[i].auto; }
+
+  // 文本改动时，保留未受影响的前缀/后缀字上的手动改音
+  function remapOverrides(oldText, newText) {
+    const a = Array.from(oldText), b = Array.from(newText);
+    let p = 0; while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    let s = 0; while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+    const out = {};
+    for (const [k, v] of Object.entries(state.overrides)) {
+      const i = +k;
+      if (i < p) out[i] = v;
+      else if (i >= a.length - s) out[i - a.length + b.length] = v;
+    }
+    state.overrides = out;
+  }
+
+  // ---------- 绘制 ----------
+  const measureCtx = document.createElement("canvas").getContext("2d");
+  function textWidth(t, fs) { measureCtx.font = `${fs}px TZPinyin`; return measureCtx.measureText(t).width; }
+
+  function el(name, attrs, parent) {
+    const n = document.createElementNS(SVGNS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+
+  // 自动大小：让最长的一行尽量放进一行（至少按 8 格算，格子 56–120px）
+  function autoSize() {
+    const w = sheet.clientWidth - 40;
+    const longest = Math.max(isNum() ? 5 : 8, ...curText().split("\n").map((l) => Array.from(l.replace(/\r/g, "")).length));
+    return Math.max(56, Math.min(120, Math.floor(w / longest)));
+  }
+
+  function render() {
+    const size = state.size || autoSize();
+    sizeEl.value = size;
+    $("sizeAuto").classList.toggle("on", !state.size);
+    const avail = sheet.clientWidth - 40;
+    const cols = Math.max(1, Math.floor(avail / size));
+    const color = state.color;
+    const showPy = state.withPinyin && !isNum();
+    const rhymeH = isNum() ? 26 : 0;
+    const b = size / 6;               // 四线三格每格高度
+    const pyH = showPy ? b * 3 : 0;
+    const gap = showPy ? size * 0.12 : 0;
+    const rowH = pyH + gap + size + rhymeH;
+    const pyFs = b / PY_XH;
+    const hanFs = size * KAI_SIZE;
+    const pad = 2;                    // 线宽留白
+    const W = cols * size;
+
+    // 按换行和列数切成行
+    const rows = [[]];
+    items.forEach((it, i) => {
+      if (it.ch === "\n") { rows.push([]); return; }
+      if (it.ch === "\r") return;
+      if (rows[rows.length - 1].length >= cols) rows.push([]);
+      rows[rows.length - 1].push(i);
+    });
+
+    sheet.textContent = "";
+    for (const row of rows) {
+      const svg = el("svg", { width: W + pad * 2, height: rowH + pad * 2,
+                              viewBox: `${-pad} ${-pad} ${W + pad * 2} ${rowH + pad * 2}` }, sheet);
+      const grid = el("g", { stroke: color, fill: "none" }, svg);
+
+      if (showPy) {
+        for (let k = 0; k < 4; k++) el("line", { x1: 0, x2: W, y1: k * b, y2: k * b, "stroke-width": 1 }, grid);
+      }
+      const top = pyH + gap;
+      for (let c = 0; c < cols; c++) {
+        const x = c * size;
+        if (state.grid === "mi") {
+          el("line", { x1: x, y1: top, x2: x + size, y2: top + size, "stroke-width": .8, "stroke-dasharray": "4 4", opacity: .7 }, grid);
+          el("line", { x1: x + size, y1: top, x2: x, y2: top + size, "stroke-width": .8, "stroke-dasharray": "4 4", opacity: .7 }, grid);
+        }
+        el("line", { x1: x + size / 2, y1: top, x2: x + size / 2, y2: top + size, "stroke-width": 1, "stroke-dasharray": "5 4" }, grid);
+        el("line", { x1: x, y1: top + size / 2, x2: x + size, y2: top + size / 2, "stroke-width": 1, "stroke-dasharray": "5 4" }, grid);
+      }
+      for (let c = 0; c <= cols; c++) el("line", { x1: c * size, x2: c * size, y1: top, y2: top + size, "stroke-width": 1.6 }, grid);
+      el("line", { x1: 0, x2: W, y1: top, y2: top, "stroke-width": 1.6 }, grid);
+      el("line", { x1: 0, x2: W, y1: top + size, y2: top + size, "stroke-width": 1.6 }, grid);
+
+      row.forEach((i, c) => {
+        const it = items[i];
+        const cx = c * size + size / 2;
+        const g = el("g", { class: "cell" + (state.overrides[i] ? " fixed" : ""), "data-i": i }, svg);
+        el("rect", { x: c * size, y: 0, width: size, height: rowH, fill: "transparent" }, g);
+
+        if (showPy && it.zh && state.mode !== "hidePy") {
+          const py = pyOf(i);
+          const t = el("text", { class: "py", x: cx, y: b * 2, "font-size": pyFs, "text-anchor": "middle",
+                                 "font-family": "TZPinyin, sans-serif", fill: "#1d1d1f" }, g);
+          t.textContent = py;
+          const maxW = size * 0.9, w = textWidth(py, pyFs);
+          if (w > maxW) { t.setAttribute("textLength", maxW); t.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
+        }
+        if (TZ.isDigit(it.ch) && TZ.DIGITS[it.ch] && (isNum() || state.mode !== "hideHan")) {
+          const T = TZ.dataTransform(c * size, top, size, 0);
+          const dg = el("g", { transform: T.attr, fill: "#1d1d1f", class: "digit" }, g);
+          for (const d of TZ.DIGITS[it.ch].s) el("path", { d }, dg);
+          if (isNum()) {
+            const t = el("text", { class: "rhyme", x: cx, y: top + size + 19, "text-anchor": "middle" }, g);
+            t.textContent = TZ.DIGITS[it.ch].rhyme;
+            const w = t.getComputedTextLength?.() || 0;
+            if (w > size * 0.96) { t.setAttribute("textLength", size * 0.96); t.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
+          }
+        } else if (it.ch.trim() && state.mode !== "hideHan" && !isNum()) {
+          const t = el("text", { x: cx, y: top + size / 2 + hanFs * KAI_CENTER, "font-size": hanFs, "text-anchor": "middle",
+                                 "font-family": "TZKai, 'Kaiti SC', STKaiti, KaiTi, serif", fill: "#1d1d1f" }, g);
+          t.textContent = it.ch;
+        }
+      });
+    }
+    $("hint").style.visibility = isNum() ? "hidden" : "visible";
+  }
+
+  // ---------- 改读音弹窗 ----------
+  let popIndex = -1, popDone = null;
+  const pop = $("pop"), veil = $("veil");
+  function openPop(i, anchor) {
+    popIndex = i;
+    const it = items[i];
+    $("popHan").textContent = it.ch;
+    const cur = pyOf(i);
+    const cands = [...new Set([it.auto, ...it.cands, cur])];
+    const box = $("popCands"); box.textContent = "";
+    for (const c of cands) {
+      const btn = document.createElement("button");
+      btn.textContent = c; if (c === cur) btn.className = "on";
+      btn.onclick = () => setPy(c);
+      box.appendChild(btn);
+    }
+    $("popInput").value = "";
+    pop.classList.add("show"); veil.classList.add("show");
+    const r = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let x = r.left + r.width / 2 - pw / 2, y = r.bottom + 8;
+    if (y + ph > innerHeight - 8) y = r.top - ph - 8;
+    pop.style.left = Math.max(8, Math.min(innerWidth - pw - 8, x)) + "px";
+    pop.style.top = Math.max(8, y) + "px";
+  }
+  function closePop() { pop.classList.remove("show"); veil.classList.remove("show"); popIndex = -1; popDone = null; }
+  function setPy(py) {
+    if (popIndex < 0) return;
+    if (py === items[popIndex].auto) delete state.overrides[popIndex];
+    else state.overrides[popIndex] = py;
+    const done = popDone;
+    save(); closePop(); render();
+    done?.(py);
+  }
+  function parseTyped(s) {
+    s = s.trim().toLowerCase().replace(/u:/g, "ü").replace(/v/g, "ü");
+    if (!s) return "";
+    if (/[1-5]$/.test(s)) s = convert(s, { format: "numToSymbol" }).replace(/5$/, "");
+    return s;
+  }
+  $("popOk").onclick = () => { const v = parseTyped($("popInput").value); if (v) setPy(v); };
+  $("popInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("popOk").click(); });
+  $("popReset").onclick = (e) => { e.preventDefault(); if (popIndex >= 0) setPy(items[popIndex].auto); };
+  veil.onclick = closePop;
+  sheet.addEventListener("click", (e) => {
+    const g = e.target.closest(".cell"); if (!g) return;
+    const i = +g.dataset.i, it = items[i];
+    if (TZ.isDigit(it.ch)) { TZ.StrokePage.open(it.ch); return; }
+    if (!it.zh) return;
+    TZ.StrokePage.open(it.ch, {
+      pinyin: pyOf(i),
+      onFixPinyin: (anchor, done) => { openPop(i, anchor); popDone = done; },
+    });
+  });
+  TZ.StrokePage.init({ color: () => state.color });
+
+  // 汉字 / 数字
+  const tabs = $("tabs");
+  function syncTab() {
+    tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === state.tab));
+    document.body.dataset.tab = state.tab;
+    input.value = curText();
+    input.placeholder = isNum() ? "输入要练习的数字，如 0123456789" : "在这里输入要练习的汉字，换行就另起一行";
+    input.inputMode = isNum() ? "numeric" : "text";
+  }
+  tabs.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || b.dataset.v === state.tab) return;
+    state.tab = b.dataset.v; save(); syncTab(); analyse(); render();
+  });
+
+  // ---------- 工具栏 ----------
+  function bindSeg(id, key, cast = (v) => v) {
+    const seg = $(id);
+    const sync = () => seg.querySelectorAll("button").forEach((b) => b.classList.toggle("on", cast(b.dataset.v) === state[key]));
+    seg.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      state[key] = cast(b.dataset.v); save(); sync(); render();
+    });
+    sync();
+  }
+  bindSeg("segPinyin", "withPinyin", (v) => v === "1");
+  bindSeg("segGrid", "grid");
+  bindSeg("segMode", "mode");
+
+  sizeEl.addEventListener("input", () => { state.size = +sizeEl.value; save(); render(); });
+  $("sizeAuto").onclick = () => { state.size = 0; save(); render(); };
+
+  const colors = $("colors");
+  const syncColor = () => colors.querySelectorAll(".swatch").forEach((s) => s.classList.toggle("on", s.dataset.c === state.color));
+  colors.addEventListener("click", (e) => {
+    const s = e.target.closest(".swatch"); if (!s) return;
+    state.color = s.dataset.c; save(); syncColor(); render();
+  });
+  syncColor();
+
+  $("sandhi").checked = state.sandhi;
+  $("sandhi").addEventListener("change", (e) => { state.sandhi = e.target.checked; save(); analyse(); render(); });
+  $("print").onclick = () => window.print();
+
+  syncTab();
+  input.addEventListener("input", () => {
+    if (isNum()) state.numText = input.value;
+    else { remapOverrides(state.text, input.value); state.text = input.value; }
+    save(); analyse(); render();
+  });
+
+  let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 120); });
+
+  analyse(); render();
+  TZ.ready.then(render);
+  Promise.all([document.fonts.load("20px TZPinyin", "zhāng"), document.fonts.load("20px TZKai", "永"), TZ.ready])
+    .then(() => { document.documentElement.dataset.fonts = "ready"; render(); });
+
+  if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("sw.js");
+})();
+</script>
+</body>
+</html>

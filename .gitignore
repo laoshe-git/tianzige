@@ -1,0 +1,4 @@
+node_modules/
+.venv-tools/
+e2e/out/
+.DS_Store
