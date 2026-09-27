@@ -1,5 +1,6 @@
 // 端到端测试：用 WebKit（iPad Safari 同内核）模拟 iPad 操作整个应用。
 // 运行：node e2e/run.mjs      产物：e2e/out/*.png + e2e/out/report.json
+// 测线上：BASE_URL=https://laoshe-git.github.io/tianzige/ node e2e/run.mjs
 import { webkit, chromium, devices } from "playwright";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -13,7 +14,8 @@ mkdirSync(out, { recursive: true });
 
 const PORT = 8790 + Math.floor(Math.random() * 100);
 const server = spawn("python3", ["-m", "http.server", String(PORT), "--directory", root], { stdio: "ignore" });
-const URL = `http://127.0.0.1:${PORT}/`;
+const BASE = process.env.BASE_URL;
+const URL = BASE || `http://127.0.0.1:${PORT}/`;
 
 const results = [];
 function check(name, ok, detail = "") {
@@ -341,7 +343,7 @@ try {
     const cb = await chromium.launch();   // Playwright 的 WebKit 不支持模拟断网，这一项用 Chromium
     const c2 = await cb.newContext({ viewport: iPad.viewport, deviceScaleFactor: 2 });
     const p2 = await c2.newPage();
-    await p2.goto(`http://localhost:${PORT}/`);
+    await p2.goto(BASE || `http://localhost:${PORT}/`);
     await p2.waitForSelector("html[data-fonts=ready]");
     await p2.evaluate(async () => { await navigator.serviceWorker.ready; });
     // 等后台把 64 片笔顺数据都缓存好
@@ -372,7 +374,7 @@ try {
   await browser.close();
   server.kill();
   const passed = results.filter((r) => r.ok).length;
-  writeFileSync(path.join(out, "report.json"), JSON.stringify({ engine: "webkit", device: "iPad Pro 11", passed, total: results.length, results }, null, 2));
+  writeFileSync(path.join(out, "report.json"), JSON.stringify({ engine: "webkit", device: "iPad Pro 11", url: URL, passed, total: results.length, results }, null, 2));
   console.log(`\n${passed}/${results.length} 通过，截图与报告在 e2e/out/`);
   process.exit(passed === results.length ? 0 : 1);
 }
